@@ -1,7 +1,7 @@
 {
-  "name": "process-mux",
+  "name": "jwt-autorefresh",
   "version": "0.1.0",
-  "description": "a lightweight module to ease control flow and signaling between forked processes and their parents heavily inspired by Redux.",
+  "description": "Factory to schedule and execute calls to refresh token endpoints in advance of token expiration.",
   "main": "lib/index.js",
   "files": [
     "lib",
@@ -9,13 +9,15 @@
     "doc"
   ],
   "keywords": [
-    "bunyan",
-    "fork",
-    "spawn",
-    "process",
-    "stream",
-    "WritableStream",
-    "EventEmitter"
+    "jwt",
+    "refresh",
+    "token",
+    "openid",
+    "oauth",
+    "expiration",
+    "exp",
+    "keepalive",
+    "unauthorized"
   ],
   "scripts": {
     "start": "npm run build -- --watch",
@@ -45,7 +47,9 @@
     "upgrade": "ncu -a && npm update"
   },
   "dependencies": {
-    "chai": "^3.5.0"
+    "chai": "^3.5.0",
+    "jwt-simple": "^0.5.0",
+    "npm-run-all": "^2.1.1"
   },
   "devDependencies": {
     "babel-cli": "^6.7.7",
@@ -60,12 +64,12 @@
   },
   "author": "Cole Chamberlain <cole.chamberlain@gmail.com> (https://github.com/cchamberlain)",
   "bugs": {
-    "url": "https://github.com/cchamberlain/process-mux/issues"
+    "url": "https://github.com/cchamberlain/jwt-autorefresh/issues"
   },
-  "homepage": "http://process-mux.js.org",
+  "homepage": "http://jwt-autorefresh.js.org",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/cchamberlain/process-mux.git"
+    "url": "git+https://github.com/cchamberlain/jwt-autorefresh.git"
   }
 }
