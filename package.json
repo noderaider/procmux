@@ -1,6 +1,6 @@
 {
   "name": "process-mux",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "a lightweight module to ease control flow and signaling between forked processes and their parents heavily inspired by Redux.",
   "main": "lib/index.js",
   "files": [
