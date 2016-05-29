@@ -27,23 +27,24 @@ export const STOP = 'STOP'
 This process schedules child processes via publishing actions.
 
 ```js
-import pmux, {EXIT} from 'process-mux'
-import {fork} from 'child_process'
+import processMux, {EXIT} from 'process-mux'
 
 import {START,PROCESS,STOP} from './actionTypes'
+
+const pmux = processMux()
 
 
 /** fork and subscribe a child process under key processor */
 let proc = pmux.fork('processor', 'processor.js')
 
 /** publish START action to all processes. */
-pmux.pub(START)
+pmux.pub({ type: START })
 
 /** get the state of the child processor. */
 console.info('post-start', proc.getState())
 
 /** publish PROCESS action to child processor and its subprocesses only. */
-proc.pub(PROCESS, { indices: [1, 2, 3] })
+proc.pub({ type: PROCESS, { indices: [1, 2, 3] } })
 
 /** get state of all processes, with keys of their process names */
 const { processor } = pmux.getState()
@@ -65,9 +66,13 @@ setTimeout(() => proc.pub(STOP), 10000)
 This process is launched as a fork from its parent and should have no knowledge regarding its parent.
 
 ```js
-import pmux, {EXIT} from 'process-mux'
+import processMux, {EXIT} from 'process-mux'
 import {START,STARTED,PROCESS,PROCESSING,PROCESSED,STOP} from './actionTypes'
 
+const pmux = processMux()
+
+/** DROPPING MIDDLEWARE IN FAVOR OF pmux.sub FOR INITIAL */
+/*
 pmux.middleware(next => action => {
   const { type, payload } = action
   switch(type) {
@@ -80,6 +85,7 @@ pmux.middleware(next => action => {
   }
   return next(action)
 })
+*/
 
 pmux.reducer((state = { status: 'child is dead', lastError: null }, action) => {
   const { type, payload, error } = action
