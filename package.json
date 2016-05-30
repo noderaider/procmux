@@ -1,7 +1,7 @@
 {
   "name": "procmux",
   "version": "0.2.2",
-  "description": "a lightweight module to ease control flow and signaling between forked processes and their parents heavily inspired by Redux.",
+  "description": "a lightweight module to ease control flow and signaling between forked processes and their parents, heavily inspired by Redux.",
   "main": "lib/index.js",
   "files": [
     "lib",
@@ -45,11 +45,10 @@
   },
   "dependencies": {
     "babel-plugin-transform-runtime": "^6.9.0",
-    "bluebird": "^3.4.0",
-    "bunyan": "^1.8.1",
-    "chai": "^3.5.0",
-    "chai-as-promised": "^5.3.0",
-    "co": "^4.6.0"
+    "bunyan": "^1.0.0",
+    "chai": "^3.0.0",
+    "chai-as-promised": "^5.0.0",
+    "co": "^4.0.0"
   },
   "devDependencies": {
     "awaitable": "^1.1.1",
