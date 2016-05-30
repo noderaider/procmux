@@ -24,41 +24,51 @@ export const STOP = 'STOP'
 
 **scheduler.js**
 
-This process schedules child processes via publishing actions.
+This process schedules child processes via dispatching actions.
 
 ```js
 import procmux, {EXIT} from 'procmux'
+import co from 'co'
+import { inspect } from 'util'
 
 import {START,PROCESS,STOP} from './actionTypes'
 
-const mux = procmux()
+co(function* () {
+  const mux = procmux()
+
+  /** fork and subscribe a child process under key processor */
+  const proc = yield mux.fork('processor', 'processor.js')
+
+  console.info(inspect(proc))) /** { dispatch, kill } */
+
+  /** dispatch START action to all processes. (maybe return state here) */
+  yield mux.dispatch({ type: START })
+
+  /** get the state of the child processor. */
+  console.info('post-start', proc.getState())
+
+  /** dispatch PROCESS action to child processor and its subprocesses only. */
+  yield proc.dispatch({ type: PROCESS, { indices: [1, 2, 3] } })
+
+  /** get state of all processes currently */
+  const { processor } = mux.getState()
+
+  /** force children to reduce and return updated state. */
+  const { processor } = yield mux.queryState()
 
 
-/** fork and subscribe a child process under key processor */
-let proc = mux.fork('processor', 'processor.js')
+  /** subscribe to EXIT action from processor */
+  proc.subscribe(EXIT, ({ code }) => console.info(`child process exited with code ${code}`))
 
-/** publish START action to all processes. */
-mux.pub({ type: START })
+  /** subscribe to EXIT action from any processor */
+  mux.subscribe(EXIT, ({ processKey, code }) => console.info(`child process ${processKey} exited with code ${code}`))
 
-/** get the state of the child processor. */
-console.info('post-start', proc.getState())
-
-/** publish PROCESS action to child processor and its subprocesses only. */
-proc.pub({ type: PROCESS, { indices: [1, 2, 3] } })
-
-/** get state of all processes, with keys of their process names */
-const { processor } = mux.getState()
-
-
-/** subscribe to EXIT action from processor */
-proc.sub(EXIT, ({ code }) => console.info(`child process exited with code ${code}`))
-
-/** subscribe to EXIT action from any processor */
-mux.sub(EXIT, ({ processKey, code }) => console.info(`child process ${processKey} exited with code ${code}`))
-
-/** Ask processor to stop processing after 10 seconds */
-setTimeout(() => proc.pub(STOP), 10000)
+  /** Ask processor to stop processing after 10 seconds */
+  setTimeout(() => proc.dispatch(STOP), 10000)
+})
 ```
+
+**DISPATCH => ACTIONS() => REDUCERS()
 
 
 **processor.js**
@@ -71,7 +81,7 @@ import {START,STARTED,PROCESS,PROCESSING,PROCESSED,STOP} from './actionTypes'
 
 const mux = procmux()
 
-/** DROPPING MIDDLEWARE IN FAVOR OF mux.sub FOR INITIAL */
+/** DROPPING MIDDLEWARE IN FAVOR OF mux.subscribe FOR INITIAL */
 /*
 mux.middleware(next => action => {
   const { type, payload } = action
@@ -113,12 +123,12 @@ mux.reducer((state = { status: 'child is dead', lastError: null }, action) => {
 
 const start = () => {
   /** start doing stuff */
-  mux.pub(STARTED)
+  mux.dispatch(STARTED)
 }
 
 const process = ({ indices }) => {
   /** kick off some processing */
-  mux.pub(PROCESSING)
+  mux.dispatch(PROCESSING)
   setTimeout(() => mux.dispatch(PROCESSED, { results: indices.map(x => x * 2 + 1) }), 5000)
 }
 

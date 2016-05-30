@@ -70,39 +70,36 @@ export default function procmux( { log = createLogger({ name: 'procmux' })
 
   const orphan = typeof process.env[PMUX] === 'undefined'
   let forks = new Map()
-  let subscribers = new Map()
+  let registers = new Map()
   let state = {}
   let reducers = {}
 
-  let reduceState = (state, action) => {
+  /** Kill a fork of this process */
+  const kill = (...args) => {
+    args.should.have.lengthOf(1)
+    const [forkID] = args
+    return dispatchFork(forkID, ({ type: KILL, payload: { forkID }}))
+  }
+
+  const reduceState = action => {
     let forkIDs = Array.from(forks.keys())
-    return Object.keys(reducers).reduce((prevState, x) => {
+    state = Object.keys(reducers).reduce((prevState, x) => {
       const reducer = reducers[x]
       return reducer ? { ...prevState, [x]: reducer(state, action) } : prevState
     }, {})
   }
 
-  const subscribe = (...args) => {
+  /**
+   * Registers an action to be run when the appropriate action type is emitted
+   * actions always run before reducers and are the location where mutation may occur
+   */
+  const register = (...args) => {
     args.should.have.lengthOf(2)
-    const [type, callback] = args
+    const [type, action] = args
     type.should.be.a('string')
       .that.matches(/^[A-Z_]+$/)
-    callback.should.be.a('function')
-
-    const subscribePayload = action => {
-      if(!action.type)
-        return
-      if(action.type === type)
-        callback(action.payload)
-    }
-
-    subscribers.set(type, callback)
-
-/*
-    Array.from(forks.values()).forEach(x => x.on('message', subscribePayload))
-    if(!orphan)
-      process.on('message', subscribePayload)
-    */
+    action.should.be.a('function')
+    registers.set(type, action)
   }
 
   const dispatchParent = action => {
@@ -125,7 +122,6 @@ export default function procmux( { log = createLogger({ name: 'procmux' })
     return child ? createForkDispatcher({ child, timeoutMS })(action) : Promise.reject(new Error(FORK_DNE))
   }
 
-
   /** IMPLEMENT THUNKS */
   const dispatch = (...args) => {
     return co(function* () {
@@ -136,7 +132,7 @@ export default function procmux( { log = createLogger({ name: 'procmux' })
           .that.is.a('string')
           .that.matches(/^[A-Z_]+$/)
 
-      state = reduceState(state, action)
+      reduceState(action)
 
       return  { parent: orphan ? null : yield dispatchParent(action)
               , children: yield Array.from(forks.entries()).map((...args) => dispatchFork(...args))
@@ -171,17 +167,22 @@ export default function procmux( { log = createLogger({ name: 'procmux' })
   const fork = (...args) => {
     return co(function* () {
       const [forkID, ...forkArgs] = validateFork(...args)
-      console.warn('INSIDE CO 7')
       const child = yield createFork({ timeoutMS })(...forkArgs)
-      console.warn('INSIDE CO 8')
       state[forkID] = {}
-      /** TODO: RETURN A SPECIALIZED DISPATCH / SUB FOR THIS SPECIFIC CHILD */
-      return forks.set(forkID, child)
-      console.warn('INSIDE CO 6')
+      forks.set(forkID, child)
+      /** Yield back controls to allow control over this specific child. */
+      return  { dispatch: createForkDispatcher({ child, timeoutMS })
+              , kill: () => kill(forkID)
+              }
     })
   }
   const getState = (...args) => {
     args.should.have.lengthOf(0)
+    return state
+  }
+  const queryState = (...args) => {
+    args.should.have.lengthOf(0)
+    reduceState(action)
     return state
   }
   const reducer = (...args) => {
@@ -197,18 +198,13 @@ export default function procmux( { log = createLogger({ name: 'procmux' })
     dispatch({ type: EXIT })
     process.exit(...args)
   }
-  const kill = (...args) => {
-    args.length.should.be.below(2)
-    const [forkID] = args
-    return dispatchFork(forkID, ({ type: KILL, payload: { forkID }}))
-  }
   if(!orphan) {
     process.on('message', action => {
       const { type } = action
       if(!type)
         return
 
-      if(subscribers.has(type))
+      if(registers.has(type))
         process.send()
       switch(type) {
         case DISPATCH:
@@ -217,5 +213,5 @@ export default function procmux( { log = createLogger({ name: 'procmux' })
     })
     process.send(muxAction(INIT, process.env[PMUX]))
   }
-  return { fork, dispatchParent, dispatchFork, dispatch, subscribe, getState, reducer, exit, kill, orphan }
+  return { fork, dispatchParent, dispatchFork, dispatch, register, getState, reducer, exit, kill, orphan }
 }

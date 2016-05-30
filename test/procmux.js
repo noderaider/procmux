@@ -46,14 +46,14 @@ describe('procmux', () => {
       it('resolves valid INIT signal for valid module path', () => mux.fork(4, validModulePath).should.be.fulfilled)
     })
 
-    describe('#subscribe', () => {
-      it('is a function', () => mux.subscribe.should.be.a('function'))
-      it('throws for 0 params', () => (() => mux.subscribe()).should.throw())
-      it('throws for greater than 2 params', () => (() => mux.subscribe('SOMETHING', () => {}, third)).should.throw())
-      it('throws for non-string first argument', () => (() => mux.subscribe(1, () => {})).should.throw())
-      it('throws for non-FSA type style first argument', () => (() => mux.subscribe('not_capitalized', () => {})).should.throw())
-      it('throws for non function type second argument', () => (() => mux.subscribe('FSA_ACTION', 'blah')).should.throw())
-      it('returns undefined for valid arguments', () => should.not.exist(mux.subscribe('FSA_ACTION', () => {})))
+    describe('#register', () => {
+      it('is a function', () => mux.register.should.be.a('function'))
+      it('throws for 0 params', () => (() => mux.register()).should.throw())
+      it('throws for greater than 2 params', () => (() => mux.register('SOMETHING', () => {}, third)).should.throw())
+      it('throws for non-string first argument', () => (() => mux.register(1, () => {})).should.throw())
+      it('throws for non-FSA type style first argument', () => (() => mux.register('not_capitalized', () => {})).should.throw())
+      it('throws for non function type second argument', () => (() => mux.register('FSA_ACTION', 'blah')).should.throw())
+      it('returns undefined for valid arguments', () => should.not.exist(mux.register('FSA_ACTION', () => {})))
     })
 
     describe('#dispatchParent', () => {
@@ -103,7 +103,7 @@ describe('procmux', () => {
 
       xcontext('when run', () => {
         it('should get exit response from fork when killed', done => {
-          mux.subscribe('EXIT', payload => {
+          mux.register('EXIT', payload => {
             done()
           })
           mux.kill('proc')
