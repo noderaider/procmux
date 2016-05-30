@@ -7,23 +7,22 @@
  const GH_PAGES_ROOT = 'doc'
 
                           /** START SCRIPT STARTS BUILD WITH WATCHING ENABLED (USEFUL WITH NPM LINK) */
-export default ({}) => ({ 'start': 'npm run build -- --watch'
+export default ({}) => ({ 'start': 'run-p build-watch test-watch'
 
                           /** CLEAN EVERYTHING PRE BUILD */
-                        , 'clean': 'run-p clean-lib clean-test clean-doc'
+                        , 'clean': 'run-p clean-lib clean-doc'
                         , 'clean-lib': 'rimraf lib'
-                        , 'clean-test': 'rimraf spec/tests'
                         , 'clean-doc': 'rimraf doc'
 
                           /** COMPILE */
                         , 'prebuild': 'npm run clean'
                         , 'build': 'babel src/lib -d lib'
-                        , 'postbuild': 'npm run build-test'
-                        , 'build-test': 'babel src/spec -d spec'
+                        , 'build-watch': 'npm run build -- --watch'
 
                           /** TEST */
                         , 'pretest': 'npm run build'
-                        , 'test': 'jasmine'
+                        , 'test': 'mocha --harmony --es_staging'
+                        , 'test-watch': 'npm run test -- --watch'
 
                           /** RELEASE */
                         , 'prerelease': 'npm run test'

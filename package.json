@@ -1,5 +1,5 @@
 {
-  "name": "process-mux",
+  "name": "procmux",
   "version": "0.2.1",
   "description": "a lightweight module to ease control flow and signaling between forked processes and their parents heavily inspired by Redux.",
   "main": "lib/index.js",
@@ -18,17 +18,16 @@
     "EventEmitter"
   ],
   "scripts": {
-    "start": "npm run build -- --watch",
-    "clean": "run-p clean-lib clean-test clean-doc",
+    "start": "run-p build-watch test-watch",
+    "clean": "run-p clean-lib clean-doc",
     "clean-lib": "rimraf lib",
-    "clean-test": "rimraf spec/tests",
     "clean-doc": "rimraf doc",
     "prebuild": "npm run clean",
     "build": "babel src/lib -d lib",
-    "postbuild": "npm run build-test",
-    "build-test": "babel src/spec -d spec",
+    "build-watch": "npm run build -- --watch",
     "pretest": "npm run build",
-    "test": "jasmine",
+    "test": "mocha --harmony --es_staging",
+    "test-watch": "npm run test -- --watch",
     "prerelease": "npm run test",
     "release": "npm version patch && npm publish",
     "postrelease": "npm run release-gh-pages",
@@ -49,6 +48,7 @@
     "bluebird": "^3.4.0",
     "bunyan": "^1.8.1",
     "chai": "^3.5.0",
+    "chai-as-promised": "^5.3.0",
     "co": "^4.6.0"
   },
   "devDependencies": {
@@ -65,12 +65,12 @@
   },
   "author": "Cole Chamberlain <cole.chamberlain@gmail.com> (https://github.com/cchamberlain)",
   "bugs": {
-    "url": "https://github.com/cchamberlain/process-mux/issues"
+    "url": "https://github.com/cchamberlain/procmux/issues"
   },
-  "homepage": "http://process-mux.js.org",
+  "homepage": "http://procmux.js.org",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/cchamberlain/process-mux.git"
+    "url": "git+https://github.com/cchamberlain/procmux.git"
   }
 }

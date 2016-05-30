@@ -1,12 +1,12 @@
-# process-mux
+# procmux
 
 **a lightweight module to ease control flow and signaling between forked processes and their parents heavily inspired by Redux.**
 
-[![NPM](https://nodei.co/npm/process-mux.png?stars=true&downloads=true)](https://nodei.co/npm/process-mux/)
+[![NPM](https://nodei.co/npm/procmux.png?stars=true&downloads=true)](https://nodei.co/npm/procmux/)
 
 ## Install
 
-`npm i -S process-mux`
+`npm i -S procmux`
 
 
 ## How to use
@@ -27,18 +27,18 @@ export const STOP = 'STOP'
 This process schedules child processes via publishing actions.
 
 ```js
-import processMux, {EXIT} from 'process-mux'
+import procmux, {EXIT} from 'procmux'
 
 import {START,PROCESS,STOP} from './actionTypes'
 
-const pmux = processMux()
+const mux = procmux()
 
 
 /** fork and subscribe a child process under key processor */
-let proc = pmux.fork('processor', 'processor.js')
+let proc = mux.fork('processor', 'processor.js')
 
 /** publish START action to all processes. */
-pmux.pub({ type: START })
+mux.pub({ type: START })
 
 /** get the state of the child processor. */
 console.info('post-start', proc.getState())
@@ -47,14 +47,14 @@ console.info('post-start', proc.getState())
 proc.pub({ type: PROCESS, { indices: [1, 2, 3] } })
 
 /** get state of all processes, with keys of their process names */
-const { processor } = pmux.getState()
+const { processor } = mux.getState()
 
 
 /** subscribe to EXIT action from processor */
 proc.sub(EXIT, ({ code }) => console.info(`child process exited with code ${code}`))
 
 /** subscribe to EXIT action from any processor */
-pmux.sub(EXIT, ({ processKey, code }) => console.info(`child process ${processKey} exited with code ${code}`))
+mux.sub(EXIT, ({ processKey, code }) => console.info(`child process ${processKey} exited with code ${code}`))
 
 /** Ask processor to stop processing after 10 seconds */
 setTimeout(() => proc.pub(STOP), 10000)
@@ -66,14 +66,14 @@ setTimeout(() => proc.pub(STOP), 10000)
 This process is launched as a fork from its parent and should have no knowledge regarding its parent.
 
 ```js
-import processMux, {EXIT} from 'process-mux'
+import procmux, {EXIT} from 'procmux'
 import {START,STARTED,PROCESS,PROCESSING,PROCESSED,STOP} from './actionTypes'
 
-const pmux = processMux()
+const mux = procmux()
 
-/** DROPPING MIDDLEWARE IN FAVOR OF pmux.sub FOR INITIAL */
+/** DROPPING MIDDLEWARE IN FAVOR OF mux.sub FOR INITIAL */
 /*
-pmux.middleware(next => action => {
+mux.middleware(next => action => {
   const { type, payload } = action
   switch(type) {
     case START:
@@ -87,7 +87,7 @@ pmux.middleware(next => action => {
 })
 */
 
-pmux.reducer((state = { status: 'child is dead', lastError: null }, action) => {
+mux.reducer((state = { status: 'child is dead', lastError: null }, action) => {
   const { type, payload, error } = action
   if(error)
     return { ...state, lastError: payload }
@@ -113,22 +113,22 @@ pmux.reducer((state = { status: 'child is dead', lastError: null }, action) => {
 
 const start = () => {
   /** start doing stuff */
-  pmux.pub(STARTED)
+  mux.pub(STARTED)
 }
 
 const process = ({ indices }) => {
   /** kick off some processing */
-  pmux.pub(PROCESSING)
-  setTimeout(() => pmux.dispatch(PROCESSED, { results: indices.map(x => x * 2 + 1) }), 5000)
+  mux.pub(PROCESSING)
+  setTimeout(() => mux.dispatch(PROCESSED, { results: indices.map(x => x * 2 + 1) }), 5000)
 }
 
 const stop = () => {
-  /** pmux.exit triggers a process.exit but ensures the middleware and reducer get run with the exit status first. */
-  pmux.exit(0)
+  /** mux.exit triggers a process.exit but ensures the middleware and reducer get run with the exit status first. */
+  mux.exit(0)
 }
 
 
 
 /** handle special logic when this was run directly from command line (not forked). */
-if(pmux.orphan) start()
+if(mux.orphan) start()
 ```
