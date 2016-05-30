@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <base data-ice="baseUrl" href="../../">
+  <title data-ice="title">lib/index.js | API Document</title>
+  <link type="text/css" rel="stylesheet" href="css/style.css">
+  <link type="text/css" rel="stylesheet" href="css/prettify-tomorrow.css">
+  <script src="script/prettify/prettify.js"></script>
+  
+  
+  <script src="script/manual.js"></script>
+</head>
+<body class="layout-container" data-ice="rootContainer">
+
+<header>
+  <a href="./">Home</a>
+  
+  <a href="identifiers.html">Reference</a>
+  <a href="source.html">Source</a>
+  
+  <a data-ice="repoURL" href="https://github.com/cchamberlain/procmux" class="repo-url-github">Repository</a>
+  <div class="search-box">
+  <span>
+    <img src="./image/search.png">
+    <span class="search-input-edge"></span><input class="search-input"><span class="search-input-edge"></span>
+  </span>
+    <ul class="search-result"></ul>
+  </div>
+</header>
+
+<nav class="navigation" data-ice="nav"><div>
+  <ul>
+    
+  <li data-ice="doc"><span data-ice="kind" class="kind-function">F</span><span data-ice="name"><span><a href="function/index.html#static-function-procmux">procmux</a></span></span></li>
+<li data-ice="doc"><span data-ice="kind" class="kind-variable">V</span><span data-ice="name"><span><a href="variable/index.html#static-variable-EXIT">EXIT</a></span></span></li>
+</ul>
+</div>
+</nav>
+
+<div class="content" data-ice="content"><h1 data-ice="title">lib/index.js</h1>
+<pre class="source-code line-number raw-source-code"><code class="prettyprint linenums" data-ice="content">import co from &apos;co&apos;
+import { createLogger } from &apos;bunyan&apos;
+import cp from &apos;child_process&apos;
+import { inspect } from &apos;util&apos;
+import chai from &apos;chai&apos;
+const should = chai.should()
+
+const PMUX = &apos;PMUX&apos;
+const ROOT = &apos;ROOT&apos;
+const INIT = &apos;INIT&apos;
+const DISPATCH= &apos;DISPATCH&apos;
+const REDUCE = &apos;REDUCE&apos;
+const NO_INIT = &apos;NO_INIT&apos;
+const SYNC_ERROR = &apos;SYNC_ERROR&apos;
+const FORK_DNE = &apos;FORK_DNE&apos;
+const FORK_ERROR = &apos;FORK_ERROR&apos;
+const FORK_DNV = &apos;FORK_DNV&apos;
+const TIMEOUT = &apos;TIMEOUT&apos;
+const PARENT_RECEIVED = &apos;PARENT_RECEIVED&apos;
+const FORK_RECEIVED = &apos;FORK_RECEIVED&apos;
+const ORPHAN = &apos;ORPHAN&apos;
+export const EXIT = &apos;EXIT&apos;
+const KILL = &apos;KILL&apos;
+
+function muxAction(...args) {
+  const [type, payload] = args
+  if(!type)
+    return
+  return ({ type, payload })
+}
+
+const createFork = ({ timeoutMS }) =&gt; (...args) =&gt; new Promise((resolve, reject) =&gt; {
+  let timeoutID = null
+  timeoutMS.should.be.a(&apos;number&apos;)
+  args.should.be.an(&apos;array&apos;).and.have.length.within(1, 3)
+  const child = cp.fork(...args)
+  timeoutID = setTimeout(() =&gt; {
+    if(child.stdin)
+      child.stdin.pause()
+    child.kill()
+    reject(new Error(NO_INIT))
+  }, timeoutMS)
+  child.on(&apos;close&apos;, () =&gt; reject(new Error(&apos;CLOSE_BEFORE_INIT&apos;)))
+  child.on(&apos;disconnect&apos;, () =&gt; console.warn(&apos;DISCONNECT&apos;))
+  child.on(&apos;error&apos;, err =&gt; reject(err))
+  child.on(&apos;exit&apos;, () =&gt; reject(new Error(&apos;EXIT_BEFORE_INIT&apos;)))
+  child.on(&apos;message&apos;, action =&gt; {
+    if(action.type === INIT) {
+      clearTimeout(timeoutID)
+      resolve(child)
+    }
+  })
+})
+
+
+const createForkDispatcher = ({ child, timeoutMS }) =&gt; action =&gt; new Promise((resolve, reject) =&gt; {
+  should.exist(child)
+  action.should.be.an(&apos;object&apos;)
+    that.has.property(&apos;type&apos;)
+      .that.matches(/^[A-Z_]+$/)
+
+  child.on(&apos;message&apos;, {})
+  child.send(action)
+})
+
+
+export default function procmux( { log = createLogger({ name: &apos;procmux&apos; })
+                                    , timeoutMS = 4000
+                                    } = {} ) {
+
+  const orphan = typeof process.env[PMUX] === &apos;undefined&apos;
+  let forks = new Map()
+  let subscribers = new Map()
+  let state = {}
+  let reducers = {}
+
+  let reduceState = (state, action) =&gt; {
+    let forkIDs = Array.from(forks.keys())
+    return Object.keys(reducers).reduce((prevState, x) =&gt; {
+      const reducer = reducers[x]
+      return reducer ? { ...prevState, [x]: reducer(state, action) } : prevState
+    }, {})
+  }
+
+  const subscribe = (...args) =&gt; {
+    args.should.have.lengthOf(2)
+    const [type, callback] = args
+    type.should.be.a(&apos;string&apos;)
+      .that.matches(/^[A-Z_]+$/)
+    callback.should.be.a(&apos;function&apos;)
+
+    const subscribePayload = action =&gt; {
+      if(!action.type)
+        return
+      if(action.type === type)
+        callback(action.payload)
+    }
+
+    subscribers.set(type, callback)
+
+/*
+    Array.from(forks.values()).forEach(x =&gt; x.on(&apos;message&apos;, subscribePayload))
+    if(!orphan)
+      process.on(&apos;message&apos;, subscribePayload)
+    */
+  }
+
+  const dispatchParent = action =&gt; {
+    if(orphan)
+      return Promise.reject(new Error(ORPHAN))
+    return new Promise((resolve, reject) =&gt; {
+      const timeoutID = setTimeout(() =&gt; reject(new Error(TIMEOUT)))
+      process.on(&apos;message&apos;, action =&gt; {
+        const { type, payload } = action
+        if(type === PARENT_RECEIVED) {
+          resolve(payload)
+        }
+      })
+      process.send(action)
+    })
+  }
+
+  const dispatchFork = (forkID, action) =&gt; {
+    const child = forks.get(forkID)
+    return child ? createForkDispatcher({ child, timeoutMS })(action) : Promise.reject(new Error(FORK_DNE))
+  }
+
+
+  /** IMPLEMENT THUNKS */
+  const dispatch = (...args) =&gt; {
+    return co(function* () {
+      const [action] = args
+      should.exist(action)
+      action.should.be.an(&apos;object&apos;)
+        .that.has.property(&apos;type&apos;)
+          .that.is.a(&apos;string&apos;)
+          .that.matches(/^[A-Z_]+$/)
+
+      state = reduceState(state, action)
+
+      return  { parent: orphan ? null : yield dispatchParent(action)
+              , children: yield Array.from(forks.entries()).map((...args) =&gt; dispatchFork(...args))
+              }
+    })
+  }
+
+  const validateFork = (...args) =&gt; {
+    try {
+      console.warn(&apos;INSIDE CO 1&apos;, args)
+      args.length.should.be.above(0).and.below(5)
+      console.warn(&apos;INSIDE CO 2&apos;)
+      const [forkID, ...forkArgs] = args
+      console.warn(&apos;INSIDE CO 3&apos;)
+      should.exist(forkID)
+      forks.has(forkID).should.be.false
+      console.warn(&apos;INSIDE CO 4&apos;)
+      const [modulePath, childArgs, options] = forkArgs
+      console.warn(&apos;INSIDE CO 5&apos;)
+      should.exist(modulePath)
+      console.warn(&apos;INSIDE CO 6&apos;)
+      modulePath.should.be.a(&apos;string&apos;)
+      const env = { [PMUX]: forkID }
+      const opts = options ? { ...options, env  } : { env }
+      const lastArgs = childArgs ? [childArgs, opts] : [opts]
+      return [forkID, modulePath, ...lastArgs]
+    } catch(err) {
+      throw new Error(FORK_DNV)
+    }
+  }
+
+  const fork = (...args) =&gt; {
+    return co(function* () {
+      const [forkID, ...forkArgs] = validateFork(...args)
+      console.warn(&apos;INSIDE CO 7&apos;)
+      const child = yield createFork({ timeoutMS })(...forkArgs)
+      console.warn(&apos;INSIDE CO 8&apos;)
+      state[forkID] = {}
+      /** TODO: RETURN A SPECIALIZED DISPATCH / SUB FOR THIS SPECIFIC CHILD */
+      return forks.set(forkID, child)
+      console.warn(&apos;INSIDE CO 6&apos;)
+    })
+  }
+  const getState = (...args) =&gt; {
+    args.should.have.lengthOf(0)
+    return state
+  }
+  const reducer = (...args) =&gt; {
+    args.should.have.lengthOf(1)
+    const [_reducer] = args
+    _reducer.should.be.a(&apos;function&apos;)
+    reducers[process.env[PMUX] || ROOT] = _reducer
+  }
+  const exit = (...args) =&gt; {
+    args.length.should.be.below(2)
+    const exitAction = { type: EXIT }
+    /** TODO REDUCE FIRST? */
+    dispatch({ type: EXIT })
+    process.exit(...args)
+  }
+  const kill = (...args) =&gt; {
+    args.length.should.be.below(2)
+    const [forkID] = args
+    return dispatchFork(forkID, ({ type: KILL, payload: { forkID }}))
+  }
+  if(!orphan) {
+    process.on(&apos;message&apos;, action =&gt; {
+      const { type } = action
+      if(!type)
+        return
+
+      if(subscribers.has(type))
+        process.send()
+      switch(type) {
+        case DISPATCH:
+          process.send()
+      }
+    })
+    process.send(muxAction(INIT, process.env[PMUX]))
+  }
+  return { fork, dispatchParent, dispatchFork, dispatch, subscribe, getState, reducer, exit, kill, orphan }
+}
+</code></pre>
+
+</div>
+
+<footer class="footer">
+  Generated by <a href="https://esdoc.org">ESDoc<span data-ice="esdocVersion">(0.4.7)</span></a>
+</footer>
+
+<script src="script/search_index.js"></script>
+<script src="script/search.js"></script>
+<script src="script/pretty-print.js"></script>
+<script src="script/inherited-summary.js"></script>
+<script src="script/test-summary.js"></script>
+<script src="script/inner-link.js"></script>
+<script src="script/patch-for-local.js"></script>
+</body>
+</html>
