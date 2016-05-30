@@ -1,6 +1,6 @@
 {
   "name": "procmux",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "a lightweight module to ease control flow and signaling between forked processes and their parents, heavily inspired by Redux.",
   "main": "lib/index.js",
   "files": [
