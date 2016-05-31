@@ -1,6 +1,6 @@
 # procmux
 
-**a lightweight module to ease control flow and signaling between forked processes and their parents heavily inspired by Redux.**
+**a lightweight module to ease control flow and signaling between forked processes and their parents. Heavily inspired by Redux and works best with co.**
 
 [![NPM](https://nodei.co/npm/procmux.png?stars=true&downloads=true)](https://nodei.co/npm/procmux/)
 
@@ -31,15 +31,21 @@ import procmux, {EXIT} from 'procmux'
 import co from 'co'
 import { inspect } from 'util'
 
-import {START,PROCESS,STOP} from './actionTypes'
+import {START,STARTED,PROCESS,STOP,STOPPED} from './actionTypes'
+
+
 
 co(function* () {
-  const mux = procmux()
+  const mux = procmux(reducer)
 
-  /** fork and subscribe a child process under key processor */
+  /** fork and add child process under key 'processor' and stop until the child is ready to go */
   const proc = yield mux.fork('processor', 'processor.js')
 
-  console.info(inspect(proc))) /** { dispatch, kill } */
+  console.info(inspect(proc))) /** { dispatch, register, kill } */
+
+  /** register an action to run when child dispatches its EXIT action. */
+  proc.register(EXIT, ({ code }) => console.info(`child process exited with code ${code}`))
+
 
   /** dispatch START action to all processes. (maybe return state here) */
   yield mux.dispatch({ type: START })
@@ -57,11 +63,9 @@ co(function* () {
   const { processor } = yield mux.queryState()
 
 
-  /** subscribe to EXIT action from processor */
-  proc.subscribe(EXIT, ({ code }) => console.info(`child process exited with code ${code}`))
 
-  /** subscribe to EXIT action from any processor */
-  mux.subscribe(EXIT, ({ processKey, code }) => console.info(`child process ${processKey} exited with code ${code}`))
+  /** register an action from any child or parent */
+  mux.register(EXIT, ({ processKey, code }) => console.info(`child process ${processKey} exited with code ${code}`))
 
   /** Ask processor to stop processing after 10 seconds */
   setTimeout(() => proc.dispatch(STOP), 10000)
@@ -77,68 +81,49 @@ This process is launched as a fork from its parent and should have no knowledge 
 
 ```js
 import procmux, {EXIT} from 'procmux'
-import {START,STARTED,PROCESS,PROCESSING,PROCESSED,STOP} from './actionTypes'
+import {START,STARTED,PROCESS,PROCESSED,STOP} from './actionTypes'
 
-const mux = procmux()
 
-/** DROPPING MIDDLEWARE IN FAVOR OF mux.subscribe FOR INITIAL */
-/*
-mux.middleware(next => action => {
-  const { type, payload } = action
+/** Reducers work identically to those in Redux. */
+function reducer (state = {}, action = {}) {
+  const { type } = action
   switch(type) {
     case START:
-      start(payload)
-    case PROCESS:
-      process(payload)
-    case STOP:
-      stop(payload)
-  }
-  return next(action)
-})
-*/
-
-mux.reducer((state = { status: 'child is dead', lastError: null }, action) => {
-  const { type, payload, error } = action
-  if(error)
-    return { ...state, lastError: payload }
-  switch(type) {
-    case START:
-      return { ...state, status: 'child is starting' }
+      return { ...state, status: 'STARTING' }
     case STARTED:
-      return { ...state, status: 'child is running' }
-    case PROCESS:
-      return { ...state, status: `child is about to process indices ${payload.indices.join(', ')}` }
-    case PROCESSING:
-      return { ...state, status: 'child is processing' }
     case PROCESSED:
-      return { ...state, status: 'child finished processing with results ${payload.results.join(', ')}' }
+      return { ...state, status: 'RUNNING' }
+    case PROCESS:
+      return { ...state, status: 'PROCESSING' }
     case STOP:
-      return { ...state, status: 'child is stopping' }
+      return { ...state, status: 'STOPPING' }
     case EXIT:
-      return { ...state, status: `child is dead with exit code ${payload.code}` }
+      return { ...state, status: 'OFF' }
   }
   return state
+}
+
+/** Each process can register max of 1 reducer. It is not used within this process, only for its parents. */
+const mux = procmux(reducer)
+
+function start() {
+  setTimeout(() => mux.dispatch({ type: STARTED }), 1000)
+}
+
+
+mux.register(START, start)
+
+mux.register(PROCESS, () => {
+  /** kick off some processing */
+  mux.dispatch({ type: PROCESSING })
+  setTimeout(() => mux.dispatch({ type: PROCESSED }), 5000)
 })
 
-
-const start = () => {
-  /** start doing stuff */
-  mux.dispatch(STARTED)
-}
-
-const process = ({ indices }) => {
-  /** kick off some processing */
-  mux.dispatch(PROCESSING)
-  setTimeout(() => mux.dispatch(PROCESSED, { results: indices.map(x => x * 2 + 1) }), 5000)
-}
-
-const stop = () => {
-  /** mux.exit triggers a process.exit but ensures the middleware and reducer get run with the exit status first. */
+mux.register(STOP, () => {
+  /** mux.exit triggers a process.exit but ensures the reducer gets run first to return final state. */
   mux.exit(0)
-}
+})
 
-
-
-/** handle special logic when this was run directly from command line (not forked). */
-if(mux.orphan) start()
+/** Call init to tell parent its ready, provide optional start function to be executed immediately if there is no parent process. (executed at CLI) */
+mux.init(start)
 ```

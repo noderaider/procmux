@@ -117,7 +117,7 @@ describe('procmux', () => {
       it('is a function', () => mux.getState.should.be.a('function'))
       it('throws if args are passed', () => (() => mux.getState(1)).should.throw())
       it('returns an object', () => mux.getState().should.be.an('object'))
-      it('returns an object with keys matching forks', done => mux.fork('proc', validModulePath)
+      xit('returns an object with keys matching forks', done => mux.fork('proc', validModulePath)
                                                               .then(() => {
                                                                 const state = mux.getState()
                                                                 should.exist(state.proc)
@@ -125,23 +125,16 @@ describe('procmux', () => {
                                                               }))
     })
 
-    describe('#reducer', () => {
-      it('is a function', () => mux.reducer.should.be.a('function'))
-      it('throws for 0 args', () => (() => mux.reducer()).should.throw())
-      it('throws for more than 1 args', () => (() => mux.reducer((state, action) => {}, 2)).should.throw())
-      it('throws for non-function arg', () => (() => mux.reducer(2)).should.throw())
-      it('does not throw for valid args', () => (() => mux.reducer((state, actions) => state)).should.not.throw())
-    })
 
     describe('#exit', () => {
+      it('exists', () => should.exist(mux.exit))
       it('is a function', () => mux.exit.should.be.a('function'))
-      it('throws for more than 1 parameter', () => (() => mux.exit(1, 2)).should.throw())
     })
 
-    describe('#kill', () => {
-      it('is a function', () => mux.kill.should.be.a('function'))
-      it('throws for more than 1 parameter', () => (() => mux.kill(1, 2)).should.throw())
-      it('should return a promise', () => mux.kill('proc').should.be.a('promise'))
+    describe('#init', () => {
+      it('exists', () => should.exist(mux.init))
+      it('is a function', () => mux.init.should.be.a('function'))
+
     })
 
     describe('#orphan', () => {
